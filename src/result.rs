@@ -24,7 +24,7 @@ pub enum RispError {
 pub struct RispResult<T>(Result<T, RispError>);
 
 impl RispResult<()> {
-    pub fn ok() -> RispResult<()> {
+    pub fn _ok() -> RispResult<()> {
         RispResult { 0: Ok(()) }
     }
 }
