@@ -15,6 +15,6 @@ pub enum ParseError {
     MissingRightParenthesis,
     #[error("unparseable empty expression passed in")]
     EmptyExpression,
-    #[error("unable to parse symbol {0}")]
-    SymbolParseError(#[from] SymbolParseError),
+    #[error("forbidden char in symbol {0}")]
+    ForbiddenCharInSymbol(u8),
 }
