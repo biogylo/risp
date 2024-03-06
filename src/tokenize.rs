@@ -1,5 +1,6 @@
+use std::str;
 use crate::parse_error::{ParseError, SymbolParseError};
-use crate::tokenize::AstNode::{List, Symbol};
+use crate::tokenize::AstNode::{List, Number, Symbol};
 use crate::tokenize::AstToken::{Parsed, ParsedRest};
 
 
@@ -12,7 +13,7 @@ enum AstToken<'a> {
 #[derive(Debug, Eq, PartialEq)]
 enum AstNode {
     List(Box<[AstNode]>),
-    // Int(isize),
+    Number(isize),
     Symbol(Box<[u8]>),
 }
 
@@ -25,7 +26,11 @@ impl AstNode {
         if let Some(bad_char) = buffer.iter().filter(is_symbol_forbidden_char).next() {
             return Err(ParseError::ForbiddenCharInSymbol(*bad_char));
         }
-        Ok(Symbol(buffer.into()))
+        if let Ok(number) = str::from_utf8(buffer).expect("We shouldn't be taking weird strings").parse() {
+            Ok(Number(number))
+        } else {
+            Ok(Symbol(buffer.into()))
+        }
     }
 
     fn from_symbol(buffer: &[u8]) -> AstNode {
@@ -131,6 +136,12 @@ mod tests {
     use std::assert_matches::assert_matches;
     use crate::tokenize::AstToken::Parsed;
     use super::*;
+
+    #[test]
+    fn number_tokenized() {
+        let result = tokenize(b"  -5124  ").unwrap();
+        assert_matches!(result, Parsed(Number(-5124)));
+    }
 
     #[test]
     fn returns_empty_node_when_empty() {
