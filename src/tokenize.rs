@@ -1,32 +1,55 @@
+use std::fmt::{Debug, Formatter};
 use std::str;
-use crate::parse_error::{ParseError, SymbolParseError};
+use str::from_utf8;
+
+use crate::parse_error::ParseError;
 use crate::tokenize::AstNode::{List, Number, Symbol};
 use crate::tokenize::AstToken::{Parsed, ParsedRest};
 
-
 #[derive(Debug, Eq, PartialEq)]
-enum AstToken<'a> {
+pub enum AstToken<'a> {
     Parsed(AstNode),
     ParsedRest((AstNode, &'a [u8])),
 }
 
-#[derive(Debug, Eq, PartialEq)]
-enum AstNode {
+#[derive(Eq, PartialEq)]
+pub enum AstNode {
     List(Box<[AstNode]>),
     Number(isize),
     Symbol(Box<[u8]>),
 }
 
+impl Debug for AstNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            List(nodes) => {
+                write!(f, "[", )?;
+                nodes.iter().map(|node| write!(f, "{:?}, ", node)).collect::<Result<_, _>>()?;
+                write!(f, "]", )?;
+                Ok(())
+            }
+            Number(number) => {
+                write!(f, "{}", number)?;
+                Ok(())
+            }
+            Symbol(symbol_buffer) => {
+                write!(f, "\"{}\"", from_utf8(symbol_buffer).expect("Symbols should always be UTF-8"))?;
+                Ok(())
+            }
+        }
+    }
+}
+
 impl AstNode {
-    fn new() -> AstNode {
+    fn _new() -> AstNode {
         vec![].into()
     }
 
     fn try_parse_symbol(buffer: &[u8]) -> Result<AstNode, ParseError> {
         if let Some(bad_char) = buffer.iter().filter(is_symbol_forbidden_char).next() {
-            return Err(ParseError::ForbiddenCharInSymbol(*bad_char));
+            return Err(ParseError::ForbiddenCharInSymbol((*bad_char).into()));
         }
-        if let Ok(number) = str::from_utf8(buffer).expect("We shouldn't be taking weird strings").parse() {
+        if let Ok(number) = from_utf8(buffer).expect("We shouldn't be taking weird strings").parse() {
             Ok(Number(number))
         } else {
             Ok(Symbol(buffer.into()))
@@ -51,7 +74,7 @@ impl<const N: usize> From<&[u8; N]> for AstNode {
 }
 
 
-const SYMBOL_FORBIDDEN_CHARS: &[u8; 6] = b"(){}<>";
+const SYMBOL_FORBIDDEN_CHARS: &[u8] = b"[](){}<>\"\'";
 
 
 fn is_symbol_forbidden_char(c: &&u8) -> bool {
@@ -96,7 +119,7 @@ fn tokenize_symbol(buffer: &[u8]) -> Result<AstToken, ParseError> {
 
 // Assuming the token is a list without outer parens -> "x y (y z s) s (f (f)) (s (s ( )))"
 // Attempt to return token and rest -> "x", "y (y z s) s (f (f)) (s (s ( )))"
-fn tokenize(buffer: &[u8]) -> Result<AstToken, ParseError> {
+pub fn tokenize(buffer: &[u8]) -> Result<AstToken, ParseError> {
     let trimmed = buffer.trim_ascii();
     let Some(first_char) = trimmed.first() else {
         // Nothing left to tokenize
@@ -134,7 +157,9 @@ fn tokenize(buffer: &[u8]) -> Result<AstToken, ParseError> {
 #[cfg(test)]
 mod tests {
     use std::assert_matches::assert_matches;
+
     use crate::tokenize::AstToken::Parsed;
+
     use super::*;
 
     #[test]
@@ -214,7 +239,7 @@ mod tests {
 
             assert_matches!(
                 result,
-                Err(ParseError::ForbiddenCharInSymbol(found)) if found == *forbidden_char
+                Err(ParseError::ForbiddenCharInSymbol(found.into())) if found == *forbidden_char
             );
         }
     }

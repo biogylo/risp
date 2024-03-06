@@ -3,5 +3,5 @@
 #![feature(assert_matches)]
 #![feature(ascii_char)]
 
-mod tokenize;
+pub mod tokenize;
 pub mod parse_error;

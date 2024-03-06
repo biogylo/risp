@@ -1,12 +1,5 @@
 use thiserror::Error;
 
-
-#[derive(Error, Debug)]
-pub enum SymbolParseError {
-    #[error("forbidden char in symbol {0}")]
-    ForbiddenCharInSymbol(u8)
-}
-
 #[derive(Error, Debug)]
 pub enum ParseError {
     #[error("missing left parenthesis in S expression")]
@@ -15,6 +8,8 @@ pub enum ParseError {
     MissingRightParenthesis,
     #[error("unparseable empty expression passed in")]
     EmptyExpression,
-    #[error("forbidden char in symbol {0}")]
-    ForbiddenCharInSymbol(u8),
+    #[error("forbidden char in symbol ({0})")]
+    ForbiddenCharInSymbol(char),
+    #[error("the given expression was not an S expression")]
+    NotAnSExpression,
 }

@@ -1,11 +1,12 @@
-use crate::USAGE;
 use std::convert::Infallible;
 use std::io;
 use std::ops::{ControlFlow, FromResidual, Try};
 use std::ops::ControlFlow::{Break, Continue};
 use std::process::Termination;
+
 use thiserror::Error;
 
+use crate::USAGE;
 
 #[derive(Error, Debug)]
 pub enum CliError {
@@ -19,6 +20,7 @@ pub enum RispError {
     CliError(CliError),
     #[error("unable to open file {0}")]
     UnableToOpenFile(#[from] io::Error),
+
 }
 
 pub struct RispResult<T>(Result<T, RispError>);
