@@ -5,24 +5,17 @@
 use std::{env, io};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
+use std::process::ExitCode;
 
 use jirsp::parse_error::ParseError;
 use jirsp::tokenize::AstNode;
 use jirsp::tokenize::AstToken::Parsed;
 use jirsp::tokenize::tokenize;
 
-use crate::result::CliError::TooManyArguments;
 use crate::result::RispError;
-use crate::result::RispResult;
 
 mod result;
 
-const USAGE: &'static str = "Usage:
-    risp <filepath>
-        Interpret risp from a file
-    risp
-        Repl
-";
 
 fn get_input_handle(arguments: &[String]) -> Result<Box<dyn BufRead>, RispError> {
     match arguments {
@@ -35,17 +28,16 @@ fn get_input_handle(arguments: &[String]) -> Result<Box<dyn BufRead>, RispError>
             Ok(Box::new(BufReader::new(f)))
         }
         _ => {
-            Err(RispError::CliError(TooManyArguments(arguments.len())))
+            Err(RispError::TooManyArguments(arguments.len()))
         }
     }
 }
 
-fn take_line(reader: &mut dyn BufRead) -> Option<Box<[u8]>> {
+fn read(reader: &mut dyn BufRead) -> Option<Box<[u8]>> {
     print!("user>");
     io::stdout().flush().unwrap();
     let mut line: Vec<u8> = vec![];
     let char_count = reader.read_until(b'\n', &mut line).expect("For now, lets assume there is a line");
-    assert!(line.is_ascii(), "We should only be using ascii here, the line: {:?}", line);
     if char_count == 0 {
         // EOF reached
         None
@@ -55,8 +47,7 @@ fn take_line(reader: &mut dyn BufRead) -> Option<Box<[u8]>> {
     }
 }
 
-
-fn read(line: &[u8]) -> Result<AstNode, ParseError> {
+fn eval(line: &[u8]) -> Result<AstNode, ParseError> {
     if let Parsed(node) = tokenize(line)? {
         Ok(node)
     } else {
@@ -64,27 +55,31 @@ fn read(line: &[u8]) -> Result<AstNode, ParseError> {
     }
 }
 
-fn eval(node: AstNode) -> AstNode { node }
 
-fn print(node: AstNode) {
-    println!("{:?}", node);
-    io::stdout().flush().unwrap();
+fn print(eval_result: Result<AstNode, ParseError>) {
+    match eval_result {
+        Ok(ast_node) => println!("{}", ast_node),
+        Err(parse_error) => println!("{}", parse_error)
+    };
 }
 
-
-fn main() -> RispResult<()> {
-    let arguments: Vec<String> = env::args().collect();
-    let mut handle: Box<dyn BufRead> = get_input_handle(&arguments[1..])?;
-    while let Some(line) = take_line(handle.as_mut()) {
-        let parsed = read(&line);
-        match parsed {
-            Ok(parsed) => {
-                let result = eval(parsed);
-                let _printed = print(result);
-            }
-            Err(parse_error) => { println!("{:}", parse_error) }
-        }
+fn risp(mut input_handle: Box<dyn BufRead>) {
+    while let Some(line) = read(&mut input_handle) {
+        let result: Result<AstNode, ParseError> = eval(&line);
+        print(result);
     };
-    // EOF Reached
-    RispResult::_ok()
+}
+
+fn main() -> ExitCode {
+    let arguments: Vec<String> = env::args().collect();
+    match get_input_handle(&arguments[1..]) {
+        Err(error) => {
+            println!("{}", error);
+            ExitCode::FAILURE
+        }
+        Ok(input_handle) => {
+            risp(input_handle);
+            ExitCode::SUCCESS
+        }
+    }
 }
