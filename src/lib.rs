@@ -5,3 +5,4 @@
 
 pub mod tokenize;
 pub mod parse_error;
+pub mod eval;

@@ -3,14 +3,15 @@
 #![feature(slice_split_once)]
 
 use std::{env, io};
+use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::process::ExitCode;
 
+use jirsp::eval::{eval, EvalError, GlobalNamespace};
 use jirsp::parse_error::ParseError;
-use jirsp::tokenize::AstNode;
+use jirsp::tokenize::{AstNode, tokenize, Value};
 use jirsp::tokenize::AstToken::Parsed;
-use jirsp::tokenize::tokenize;
 
 use crate::result::RispError;
 
@@ -47,7 +48,7 @@ fn read(reader: &mut dyn BufRead) -> Option<Box<[u8]>> {
     }
 }
 
-fn eval(line: &[u8]) -> Result<AstNode, ParseError> {
+fn parse(line: &[u8]) -> Result<AstNode, ParseError> {
     if let Parsed(node) = tokenize(line)? {
         Ok(node)
     } else {
@@ -55,18 +56,30 @@ fn eval(line: &[u8]) -> Result<AstNode, ParseError> {
     }
 }
 
-
-fn print(eval_result: Result<AstNode, ParseError>) {
+fn print(eval_result: &Result<Value, impl Error>) {
     match eval_result {
-        Ok(ast_node) => println!("{}", ast_node),
-        Err(parse_error) => println!("{}", parse_error)
+        Ok(ref value) => println!("{}", value),
+        Err(ref parse_error) => println!("{}", parse_error)
+    };
+}
+
+fn print_debug(eval_result: &Result<AstNode, impl Error>) {
+    match eval_result {
+        Ok(ref ast_node) => println!("{:?}", ast_node),
+        Err(ref parse_error) => println!("{}", parse_error)
     };
 }
 
 fn risp(mut input_handle: Box<dyn BufRead>) {
+    let mut namespace = GlobalNamespace::default();
     while let Some(line) = read(&mut input_handle) {
-        let result: Result<AstNode, ParseError> = eval(&line);
-        print(result);
+        let result: Result<AstNode, ParseError> = parse(&line);
+        print_debug(&result);
+        let Ok(node) = result else {
+            continue;
+        };
+        let result: Result<Value, EvalError> = eval(&node, &mut namespace);
+        print(&result)
     };
 }
 

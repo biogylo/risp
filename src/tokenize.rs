@@ -13,7 +13,8 @@ pub enum AstToken<'a> {
     ParsedRest((AstNode, &'a [u8])),
 }
 
-#[derive(Eq, PartialEq)]
+
+#[derive(Eq, PartialEq, Clone)]
 pub enum AstNode {
     List(Box<[AstNode]>),
     Num(isize),
@@ -21,6 +22,39 @@ pub enum AstNode {
     Str(Box<[u8]>),
 }
 
+pub struct Sexpr {
+    atom: Box<[u8]>,
+
+}
+
+pub enum Value {
+    Num(isize),
+    Str(Box<[u8]>),
+}
+
+impl Value {
+    pub fn num(&self) -> Option<isize> {
+        match self {
+            Value::Num(num) => { Some(*num) }
+            Value::Str(_) => { None }
+        }
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Num(number) => {
+                write!(f, "{}", number)?;
+                Ok(())
+            }
+            Value::Str(string_buffer) => {
+                write!(f, "\"{}\"", from_utf8(string_buffer).expect("Strings should always be UTF-8"))?;
+                Ok(())
+            }
+        }
+    }
+}
 
 impl Display for AstNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -73,7 +107,7 @@ impl Debug for AstNode {
                 Ok(())
             }
             Str(string_buffer) => {
-                write!(f, "Str({})", from_utf8(string_buffer).expect("Strings should always be UTF-8"))?;
+                write!(f, "Str(\"{}\")", from_utf8(string_buffer).expect("Strings should always be UTF-8"))?;
                 Ok(())
             }
         }
@@ -224,10 +258,16 @@ pub fn tokenize(buffer: &[u8]) -> Result<AstToken, ParseError> {
                 return Ok(ParsedRest((nodes.into(), after_first_char.trim_ascii())));
             }
         };
-        if let ParsedRest((node, rest)) = tokenize(trimmed_rest)? {
-            nodes.push(node);
-            // No closing paren for us, therefore we must parse another symbol (loop again)
-            trimmed_rest = rest.trim_ascii();
+        match tokenize(trimmed_rest)? {
+            ParsedRest((node, rest)) => {
+                nodes.push(node);
+                // No closing paren for us, therefore we must parse another symbol (loop again)
+                trimmed_rest = rest.trim_ascii();
+            }
+            Parsed(_) => {
+                // If we fully parsed, it means we didn't find the closing parens as well, but we finished, error!
+                return Err(MissingRightParenthesis);
+            }
         };
     };
 }
@@ -278,9 +318,21 @@ mod tests {
     }
 
     #[test]
+    fn returns_error_if_mismatched_paren() {
+        let result = tokenize(b" (\")\" ");
+        assert_matches!(result, Err(_) );
+    }
+
+    #[test]
     fn char_after_quote_in_string_is_bad() {
         let result = tokenize(b"\"asda asdas dasd\"asd");
         assert_matches!(result, Err(StringDidntEnd));
+    }
+
+    #[test]
+    fn quote_in_between_parens_is_error() {
+        let result = tokenize(b" ( \" )");
+        assert_matches!(result, Err(MissingDoubleQuote));
     }
 
 
@@ -313,7 +365,7 @@ mod tests {
         let result = tokenize(b"  xasd   y z (x t ) d ( (d) ) ").unwrap();
         assert_matches!(
             result,
-            AstToken::ParsedRest(
+            ParsedRest(
                 (Sym(symbol_str), rest_str)
             ) if symbol_str.as_ref() == b"xasd"
                     && rest_str.trim_ascii() == b"y z (x t ) d ( (d) )"
