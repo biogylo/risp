@@ -48,6 +48,11 @@ fn lisp_plus(arguments: &[Value]) -> Result<Value, EvalError> {
     Ok(Value::Num(nums.into_iter().sum::<isize>()))
 }
 
+fn lisp_mul(arguments: &[Value]) -> Result<Value, EvalError> {
+    let nums = ensure_all_nums(arguments)?;
+    Ok(Value::Num(nums.into_iter().product()))
+}
+
 fn lisp_sub(arguments: &[Value]) -> Result<Value, EvalError> {
     let nums = ensure_all_nums(arguments)?;
     let mut nums_iter = nums.into_iter();
@@ -67,6 +72,7 @@ impl Default for GlobalNamespace {
         let mut namespace = GlobalNamespace::empty();
         namespace.defn(b"+", lisp_plus.into());
         namespace.defn(b"-", lisp_sub.into());
+        namespace.defn(b"*", lisp_mul.into());
         namespace
     }
 }
