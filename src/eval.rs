@@ -38,9 +38,23 @@ pub enum EvalError {
     InvalidArguments(String),
 }
 
+fn ensure_all_nums(arguments: &[Value]) -> Result<Box<[isize]>, EvalError> {
+    arguments.iter().map(Value::num).collect::<Option<Box<[isize]>>>()
+        .ok_or_else(|| EvalError::InvalidArguments("Unexpected non number".into()))
+}
 
 fn lisp_plus(arguments: &[Value]) -> Result<Value, EvalError> {
-    Ok(Value::Num(arguments.iter().map(Value::num).collect::<Option<Vec<isize>>>().ok_or_else(|| EvalError::InvalidArguments("Non-number in sum operation".into()))?.iter().sum()))
+    let nums = ensure_all_nums(arguments)?;
+    Ok(Value::Num(nums.into_iter().sum::<isize>()))
+}
+
+fn lisp_sub(arguments: &[Value]) -> Result<Value, EvalError> {
+    let nums = ensure_all_nums(arguments)?;
+    let mut nums_iter = nums.into_iter();
+    let Some(first) = nums_iter.next() else {
+        return Ok(Value::Num(0));
+    };
+    Ok(Value::Num(first - nums_iter.sum::<isize>()))
 }
 
 pub struct GlobalNamespace {
@@ -52,6 +66,7 @@ impl Default for GlobalNamespace {
         // Create a global namespace with all the primitives
         let mut namespace = GlobalNamespace::empty();
         namespace.defn(b"+", lisp_plus.into());
+        namespace.defn(b"-", lisp_sub.into());
         namespace
     }
 }
